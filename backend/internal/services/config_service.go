@@ -7,6 +7,7 @@ import (
 
 	"config-center/internal/database"
 	"config-center/internal/diffutil"
+	"config-center/internal/merger"
 	"config-center/internal/models"
 	"config-center/internal/push"
 	"config-center/internal/validator"
@@ -121,6 +122,69 @@ func (s *ConfigService) GetConfigItems(namespaceID, groupID uint, environment st
 func (s *ConfigService) DeleteConfigItem(id uint) error {
 	result := database.DB.Delete(&models.ConfigItem{}, id)
 	return result.Error
+}
+
+func (s *ConfigService) GetPublicNamespace(tenantID uint) (*models.Namespace, error) {
+	var ns models.Namespace
+	err := database.DB.Where("tenant_id = ? AND name = ?", tenantID, "public").First(&ns).Error
+	if err != nil {
+		return nil, err
+	}
+	return &ns, nil
+}
+
+func (s *ConfigService) GetConfigItemsByLevel(namespaceID uint, environment string, level string) ([]models.ConfigItem, error) {
+	var items []models.ConfigItem
+	err := database.DB.Where("namespace_id = ? AND environment = ? AND level = ?",
+		namespaceID, environment, level).Find(&items).Error
+	return items, err
+}
+
+func (s *ConfigService) GetMergedConfig(tenantID, namespaceID, groupID uint, environment string) (map[string]merger.MergedConfig, error) {
+	publicNS, err := s.GetPublicNamespace(tenantID)
+	if err != nil {
+		return nil, fmt.Errorf("public namespace not found: %w", err)
+	}
+
+	publicItems, _ := s.GetConfigItemsByLevel(publicNS.ID, environment, "public")
+	namespaceItems, _ := s.GetConfigItemsByLevel(namespaceID, environment, "namespace")
+	groupItems, _ := s.GetConfigItems(namespaceID, groupID, environment)
+
+	groupFiltered := make([]models.ConfigItem, 0)
+	for _, item := range groupItems {
+		if item.Level == "group" && (groupID == 0 || item.GroupID == groupID) {
+			groupFiltered = append(groupFiltered, item)
+		}
+	}
+
+	publicMap := make(map[string]string)
+	for _, item := range publicItems {
+		publicMap[item.Key] = item.Value
+	}
+
+	namespaceMap := make(map[string]string)
+	for _, item := range namespaceItems {
+		namespaceMap[item.Key] = item.Value
+	}
+
+	groupMap := make(map[string]string)
+	for _, item := range groupFiltered {
+		groupMap[item.Key] = item.Value
+	}
+
+	var format string
+	if len(groupFiltered) > 0 {
+		format = groupFiltered[0].Format
+	} else if len(namespaceItems) > 0 {
+		format = namespaceItems[0].Format
+	} else if len(publicItems) > 0 {
+		format = publicItems[0].Format
+	} else {
+		format = "json"
+	}
+
+	merged := merger.MergeConfigs(publicMap, namespaceMap, groupMap, format)
+	return merged, nil
 }
 
 func (s *ConfigService) RollbackToVersion(configItemID uint, targetVersion int, operator string) (*models.ConfigItem, error) {

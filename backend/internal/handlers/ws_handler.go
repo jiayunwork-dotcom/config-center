@@ -1,15 +1,11 @@
 package handlers
 
 import (
-	"encoding/json"
 	"log"
 	"net/http"
 	"strconv"
-	"sync"
 	"time"
 
-	"config-center/internal/database"
-	"config-center/internal/models"
 	"config-center/internal/push"
 
 	"github.com/gin-gonic/gin"
@@ -24,27 +20,15 @@ var upgrader = websocket.Upgrader{
 	},
 }
 
-type WSHandler struct {
-	clients map[uint]map[string]*websocket.Conn
-	mu      sync.RWMutex
-}
+type WSHandler struct{}
 
 var wsHandler *WSHandler
 
 func NewWSHandler() *WSHandler {
 	if wsHandler == nil {
-		wsHandler = &WSHandler{
-			clients: make(map[uint]map[string]*websocket.Conn),
-		}
-		go wsHandler.listenRedis()
+		wsHandler = &WSHandler{}
 	}
 	return wsHandler
-}
-
-func (h *WSHandler) listenRedis() {
-	for {
-		time.Sleep(1 * time.Second)
-	}
 }
 
 func (h *WSHandler) HandleWebSocket(c *gin.Context) {
@@ -63,10 +47,8 @@ func (h *WSHandler) HandleWebSocket(c *gin.Context) {
 		return
 	}
 
-	h.addClient(uint(namespaceID), clientID, conn)
-	defer h.removeClient(uint(namespaceID), clientID)
-
-	go h.updateClientConnection(uint(namespaceID), clientID, c.ClientIP())
+	push.Engine.AddWS(clientID, uint(namespaceID), c.ClientIP(), conn)
+	defer push.Engine.RemoveWS(uint(namespaceID), clientID)
 
 	conn.SetPongHandler(func(string) error {
 		conn.SetReadDeadline(time.Now().Add(60 * time.Second))
@@ -81,83 +63,7 @@ func (h *WSHandler) HandleWebSocket(c *gin.Context) {
 	}
 }
 
-func (h *WSHandler) addClient(namespaceID uint, clientID string, conn *websocket.Conn) {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-
-	if _, ok := h.clients[namespaceID]; !ok {
-		h.clients[namespaceID] = make(map[string]*websocket.Conn)
-	}
-	h.clients[namespaceID][clientID] = conn
-}
-
-func (h *WSHandler) removeClient(namespaceID uint, clientID string) {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-
-	if clients, ok := h.clients[namespaceID]; ok {
-		delete(clients, clientID)
-	}
-}
-
-func (h *WSHandler) Broadcast(namespaceID uint, event push.ConfigChangeEvent) {
-	h.mu.RLock()
-	defer h.mu.RUnlock()
-
-	clients, ok := h.clients[namespaceID]
-	if !ok {
-		return
-	}
-
-	msg, _ := json.Marshal(gin.H{
-		"type":  "config_change",
-		"event": event,
-	})
-
-	for _, conn := range clients {
-		conn.WriteMessage(websocket.TextMessage, msg)
-	}
-}
-
-func (h *WSHandler) GetWSConnectionCount(namespaceID uint) int {
-	h.mu.RLock()
-	defer h.mu.RUnlock()
-
-	if clients, ok := h.clients[namespaceID]; ok {
-		return len(clients)
-	}
-	return 0
-}
-
-func (h *WSHandler) updateClientConnection(namespaceID uint, clientID string, ip string) {
-	var conn models.ClientConnection
-	result := database.DB.Where("namespace_id = ? AND client_id = ?", namespaceID, clientID).First(&conn)
-
-	now := time.Now()
-	if result.Error != nil {
-		conn = models.ClientConnection{
-			TenantID:    1,
-			NamespaceID: namespaceID,
-			ClientID:    clientID,
-			IPAddress:   ip,
-			ConnectType: "websocket",
-			LastPullAt:  &now,
-		}
-		database.DB.Create(&conn)
-	} else {
-		conn.LastPullAt = &now
-		conn.IPAddress = ip
-		database.DB.Save(&conn)
-	}
-}
-
 func (h *WSHandler) GetConnectionStats(c *gin.Context) {
-	h.mu.RLock()
-	defer h.mu.RUnlock()
-
-	stats := make(map[uint]int)
-	for nsID, clients := range h.clients {
-		stats[nsID] = len(clients)
-	}
-	c.JSON(http.StatusOK, stats)
+	counts := push.Engine.GetAllConnectionCounts()
+	c.JSON(http.StatusOK, counts)
 }

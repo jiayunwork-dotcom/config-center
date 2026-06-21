@@ -4,7 +4,6 @@ import (
 	"net/http"
 	"strconv"
 
-	"config-center/internal/merger"
 	"config-center/internal/models"
 	"config-center/internal/services"
 	"config-center/internal/validator"
@@ -195,32 +194,21 @@ func (h *ConfigHandler) CompareVersions(c *gin.Context) {
 }
 
 func (h *ConfigHandler) GetMergedConfig(c *gin.Context) {
+	tenantID, _ := strconv.ParseUint(c.DefaultQuery("tenant_id", "1"), 10, 32)
 	namespaceID, _ := strconv.ParseUint(c.Query("namespace_id"), 10, 32)
 	groupID, _ := strconv.ParseUint(c.Query("group_id"), 10, 32)
 	environment := c.DefaultQuery("environment", "dev")
 
-	publicItems, _ := h.configService.GetConfigItems(1, 1, environment)
-	namespaceItems, _ := h.configService.GetConfigItems(uint(namespaceID), uint(groupID), environment)
-
-	publicMap := make(map[string]string)
-	for _, item := range publicItems {
-		if item.Level == "public" {
-			publicMap[item.Key] = item.Value
-		}
+	if namespaceID == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "namespace_id is required"})
+		return
 	}
 
-	namespaceMap := make(map[string]string)
-	groupMap := make(map[string]string)
-	for _, item := range namespaceItems {
-		if item.Level == "namespace" {
-			namespaceMap[item.Key] = item.Value
-		} else {
-			groupMap[item.Key] = item.Value
-		}
+	merged, err := h.configService.GetMergedConfig(uint(tenantID), uint(namespaceID), uint(groupID), environment)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
 	}
-
-	format := c.DefaultQuery("format", "json")
-	merged := merger.MergeConfigs(publicMap, namespaceMap, groupMap, format)
 
 	c.JSON(http.StatusOK, merged)
 }
