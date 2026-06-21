@@ -5,7 +5,7 @@ import { namespaceApi, groupApi, configApi } from '../api'
 
 const { DirectoryTree } = Tree
 
-function ConfigTree({ environment, onSelect }) {
+function ConfigTree({ environment, onSelect, onGroupSelect }) {
   const [treeData, setTreeData] = useState([])
   const [expandedKeys, setExpandedKeys] = useState([])
   const [addModalVisible, setAddModalVisible] = useState(false)
@@ -67,8 +67,24 @@ function ConfigTree({ environment, onSelect }) {
 
   const handleSelect = (selectedKeys, info) => {
     if (info.node.config) {
-      onSelect(info.node.config)
+      onSelect && onSelect(info.node.config)
+    } else if (info.node.group) {
+      const ns = findNamespaceByGroupId(info.node.group.id)
+      onGroupSelect && onGroupSelect(info.node.group, ns)
     }
+  }
+
+  const findNamespaceByGroupId = (groupId) => {
+    for (const ns of treeData) {
+      if (ns.children) {
+        for (const group of ns.children) {
+          if (group.group && group.group.id === groupId) {
+            return ns.namespace
+          }
+        }
+      }
+    }
+    return null
   }
 
   const handleAddNamespace = () => {

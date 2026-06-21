@@ -11,6 +11,8 @@ import (
 	"config-center/internal/models"
 	"config-center/internal/push"
 	"config-center/internal/validator"
+
+	"gorm.io/gorm"
 )
 
 type ConfigService struct{}
@@ -122,6 +124,97 @@ func (s *ConfigService) GetConfigItems(namespaceID, groupID uint, environment st
 func (s *ConfigService) DeleteConfigItem(id uint) error {
 	result := database.DB.Delete(&models.ConfigItem{}, id)
 	return result.Error
+}
+
+func (s *ConfigService) BatchDeleteConfigItems(ids []uint) error {
+	return database.DB.Transaction(func(tx *gorm.DB) error {
+		result := tx.Delete(&models.ConfigItem{}, ids)
+		return result.Error
+	})
+}
+
+type BatchCopyResult struct {
+	ID     uint   `json:"id"`
+	Key    string `json:"key"`
+	Status string `json:"status"`
+	Message string `json:"message,omitempty"`
+}
+
+func (s *ConfigService) BatchCopyConfigItems(sourceIDs []uint, targetEnv string, operator string) ([]BatchCopyResult, error) {
+	var results []BatchCopyResult
+
+	for _, id := range sourceIDs {
+		var sourceItem models.ConfigItem
+		if err := database.DB.First(&sourceItem, id).Error; err != nil {
+			results = append(results, BatchCopyResult{
+				ID:      id,
+				Key:     "",
+				Status:  "failed",
+				Message: "配置项不存在",
+			})
+			continue
+		}
+
+		var existingItem models.ConfigItem
+		err := database.DB.Where(
+			"namespace_id = ? AND group_id = ? AND key = ? AND environment = ?",
+			sourceItem.NamespaceID, sourceItem.GroupID, sourceItem.Key, targetEnv,
+		).First(&existingItem).Error
+
+		if err == nil {
+			results = append(results, BatchCopyResult{
+				ID:      existingItem.ID,
+				Key:     sourceItem.Key,
+				Status:  "skipped",
+				Message: "已存在，已跳过",
+			})
+			continue
+		}
+
+		newItem := models.ConfigItem{
+			TenantID:       sourceItem.TenantID,
+			NamespaceID:    sourceItem.NamespaceID,
+			GroupID:        sourceItem.GroupID,
+			Key:            sourceItem.Key,
+			Value:          sourceItem.Value,
+			Format:         sourceItem.Format,
+			Environment:    targetEnv,
+			Level:          sourceItem.Level,
+			Schema:         sourceItem.Schema,
+			CurrentVersion: 1,
+		}
+
+		if err := database.DB.Create(&newItem).Error; err != nil {
+			results = append(results, BatchCopyResult{
+				ID:      id,
+				Key:     sourceItem.Key,
+				Status:  "failed",
+				Message: err.Error(),
+			})
+			continue
+		}
+
+		version := &models.ConfigVersion{
+			TenantID:     newItem.TenantID,
+			ConfigItemID: newItem.ID,
+			Version:      1,
+			Value:        newItem.Value,
+			Operator:     operator,
+			ChangeType:   "create",
+			Description:  fmt.Sprintf("从 %s 环境复制", sourceItem.Environment),
+		}
+		database.DB.Create(version)
+
+		s.publishChange(&newItem)
+
+		results = append(results, BatchCopyResult{
+			ID:     newItem.ID,
+			Key:    newItem.Key,
+			Status: "success",
+		})
+	}
+
+	return results, nil
 }
 
 func (s *ConfigService) GetPublicNamespace(tenantID uint) (*models.Namespace, error) {

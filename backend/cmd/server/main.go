@@ -79,6 +79,8 @@ func main() {
 			configs.POST("/:id/rollback", configHandler.RollbackVersion)
 			configs.GET("/:id/versions", configHandler.GetVersionHistory)
 			configs.GET("/:id/compare", configHandler.CompareVersions)
+			configs.POST("/batch-delete", configHandler.BatchDeleteConfigItems)
+			configs.POST("/batch-copy", configHandler.BatchCopyConfigItems)
 		}
 
 		gray := api.Group("/gray")

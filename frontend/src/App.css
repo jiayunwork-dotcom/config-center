@@ -93,3 +93,27 @@
   justify-content: space-between;
   align-items: center;
 }
+
+.config-list-container {
+  position: relative;
+  padding-bottom: 60px;
+}
+
+.batch-action-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: #fff;
+  border-top: 1px solid #f0f0f0;
+  padding: 12px 24px;
+  z-index: 1000;
+  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.06);
+  display: flex;
+  justify-content: center;
+}
+
+.config-item-row:hover {
+  cursor: pointer;
+  background: #f5f5f5;
+}

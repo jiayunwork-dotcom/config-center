@@ -45,7 +45,10 @@ export const configApi = {
   rollback: (id, version) => api.post(`/configs/${id}/rollback`, { version }),
   getVersions: (id, params) => api.get(`/configs/${id}/versions`, { params }),
   compareVersions: (id, version1, version2) => 
-    api.get(`/configs/${id}/compare`, { params: { version1, version2 } })
+    api.get(`/configs/${id}/compare`, { params: { version1, version2 } }),
+  batchDelete: (ids) => api.post('/configs/batch-delete', { ids }),
+  batchCopy: (sourceIds, targetEnvironment) => 
+    api.post('/configs/batch-copy', { source_ids: sourceIds, target_environment: targetEnvironment })
 }
 
 export const grayApi = {

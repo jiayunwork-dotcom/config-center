@@ -121,6 +121,80 @@ func (h *ConfigHandler) DeleteConfigItem(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "deleted"})
 }
 
+func (h *ConfigHandler) BatchDeleteConfigItems(c *gin.Context) {
+	var req struct {
+		IDs []uint `json:"ids"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if len(req.IDs) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ids is required"})
+		return
+	}
+
+	if err := h.configService.BatchDeleteConfigItems(req.IDs); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "deleted", "count": len(req.IDs)})
+}
+
+func (h *ConfigHandler) BatchCopyConfigItems(c *gin.Context) {
+	var req struct {
+		SourceIDs  []uint `json:"source_ids"`
+		TargetEnv  string `json:"target_environment"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if len(req.SourceIDs) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "source_ids is required"})
+		return
+	}
+	if req.TargetEnv == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "target_environment is required"})
+		return
+	}
+
+	operator := c.GetHeader("X-Operator")
+	if operator == "" {
+		operator = "anonymous"
+	}
+
+	results, err := h.configService.BatchCopyConfigItems(req.SourceIDs, req.TargetEnv, operator)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	successCount := 0
+	skippedCount := 0
+	failedCount := 0
+	for _, r := range results {
+		switch r.Status {
+		case "success":
+			successCount++
+		case "skipped":
+			skippedCount++
+		case "failed":
+			failedCount++
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"results": results,
+		"success_count": successCount,
+		"skipped_count": skippedCount,
+		"failed_count": failedCount,
+	})
+}
+
 func (h *ConfigHandler) RollbackVersion(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {

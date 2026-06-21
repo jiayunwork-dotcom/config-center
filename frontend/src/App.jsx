@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState } from 'react'
 import { Layout, Menu, Breadcrumb, Select, Space } from 'antd'
 import { SettingOutlined, AppstoreOutlined, DashboardOutlined } from '@ant-design/icons'
 import ConfigTree from './components/ConfigTree'
 import ConfigEditor from './components/ConfigEditor'
+import ConfigItemList from './components/ConfigItemList'
 import Dashboard from './components/Dashboard'
 import './App.css'
 
@@ -12,7 +13,11 @@ const { Option } = Select
 function App() {
   const [selectedKey, setSelectedKey] = useState('configs')
   const [selectedConfig, setSelectedConfig] = useState(null)
+  const [selectedGroup, setSelectedGroup] = useState(null)
+  const [selectedNamespace, setSelectedNamespace] = useState(null)
+  const [viewMode, setViewMode] = useState('editor')
   const [environment, setEnvironment] = useState('dev')
+  const [treeRefreshKey, setTreeRefreshKey] = useState(0)
 
   const menuItems = [
     { key: 'configs', icon: <SettingOutlined />, label: '配置管理' },
@@ -21,6 +26,17 @@ function App() {
 
   const handleConfigSelect = (config) => {
     setSelectedConfig(config)
+    setViewMode('editor')
+  }
+
+  const handleGroupSelect = (group, namespace) => {
+    setSelectedGroup(group)
+    setSelectedNamespace(namespace)
+    setViewMode('list')
+  }
+
+  const handleRefreshTree = () => {
+    setTreeRefreshKey(prev => prev + 1)
   }
 
   return (
@@ -58,8 +74,10 @@ function App() {
         {selectedKey === 'configs' && (
           <Sider width={280} className="sider">
             <ConfigTree
+              key={treeRefreshKey}
               environment={environment}
               onSelect={handleConfigSelect}
+              onGroupSelect={handleGroupSelect}
             />
           </Sider>
         )}
@@ -69,13 +87,32 @@ function App() {
             <Breadcrumb.Item>
               {selectedKey === 'configs' ? '配置管理' : '监控看板'}
             </Breadcrumb.Item>
+            {selectedKey === 'configs' && selectedNamespace && (
+              <Breadcrumb.Item>{selectedNamespace.name}</Breadcrumb.Item>
+            )}
+            {selectedKey === 'configs' && selectedGroup && viewMode === 'list' && (
+              <Breadcrumb.Item>{selectedGroup.name}</Breadcrumb.Item>
+            )}
+            {selectedKey === 'configs' && selectedConfig && viewMode === 'editor' && (
+              <Breadcrumb.Item>{selectedConfig.key}</Breadcrumb.Item>
+            )}
           </Breadcrumb>
           {selectedKey === 'configs' ? (
-            <ConfigEditor
-              config={selectedConfig}
-              environment={environment}
-              onConfigChange={() => {}}
-            />
+            viewMode === 'list' ? (
+              <ConfigItemList
+                namespace={selectedNamespace}
+                group={selectedGroup}
+                environment={environment}
+                onRefresh={handleRefreshTree}
+                onSelectConfig={handleConfigSelect}
+              />
+            ) : (
+              <ConfigEditor
+                config={selectedConfig}
+                environment={environment}
+                onConfigChange={handleRefreshTree}
+              />
+            )
           ) : (
             <Dashboard environment={environment} />
           )}
