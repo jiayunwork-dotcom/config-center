@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"config-center/internal/middleware"
 	"config-center/internal/models"
 	"config-center/internal/services"
 	"config-center/internal/validator"
@@ -15,6 +16,7 @@ type ConfigHandler struct {
 	configService    *services.ConfigService
 	namespaceService *services.NamespaceService
 	groupService     *services.GroupService
+	auditService     *services.AuditService
 }
 
 func NewConfigHandler() *ConfigHandler {
@@ -22,6 +24,7 @@ func NewConfigHandler() *ConfigHandler {
 		configService:    services.NewConfigService(),
 		namespaceService: services.NewNamespaceService(),
 		groupService:     services.NewGroupService(),
+		auditService:     services.NewAuditService(),
 	}
 }
 
@@ -32,7 +35,7 @@ func (h *ConfigHandler) CreateConfigItem(c *gin.Context) {
 		return
 	}
 
-	operator := c.GetHeader("X-Operator")
+	operator := middleware.GetUsername(c)
 	if operator == "" {
 		operator = "anonymous"
 	}
@@ -42,6 +45,11 @@ func (h *ConfigHandler) CreateConfigItem(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+
+	uid := middleware.GetUserID(c)
+	uname := operator
+	rid := result.ID
+	go h.auditService.CreateLog(&uid, uname, models.ActionCreate, models.ResourceConfig, &rid, result.Key, "", item.Value, getClientIP(c))
 
 	c.JSON(http.StatusOK, result)
 }
@@ -83,6 +91,14 @@ func (h *ConfigHandler) UpdateConfigItem(c *gin.Context) {
 		return
 	}
 
+	oldItem, _ := h.configService.GetConfigItem(uint(id))
+	oldValue := ""
+	configKey := ""
+	if oldItem != nil {
+		oldValue = oldItem.Value
+		configKey = oldItem.Key
+	}
+
 	var req struct {
 		Value       string `json:"value"`
 		Description string `json:"description"`
@@ -92,7 +108,7 @@ func (h *ConfigHandler) UpdateConfigItem(c *gin.Context) {
 		return
 	}
 
-	operator := c.GetHeader("X-Operator")
+	operator := middleware.GetUsername(c)
 	if operator == "" {
 		operator = "anonymous"
 	}
@@ -102,6 +118,11 @@ func (h *ConfigHandler) UpdateConfigItem(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+
+	uid := middleware.GetUserID(c)
+	uname := operator
+	rid := result.ID
+	go h.auditService.CreateLog(&uid, uname, models.ActionUpdate, models.ResourceConfig, &rid, configKey, oldValue, req.Value, getClientIP(c))
 
 	c.JSON(http.StatusOK, result)
 }
@@ -113,10 +134,23 @@ func (h *ConfigHandler) DeleteConfigItem(c *gin.Context) {
 		return
 	}
 
+	oldItem, _ := h.configService.GetConfigItem(uint(id))
+	oldValue := ""
+	configKey := ""
+	if oldItem != nil {
+		oldValue = oldItem.Value
+		configKey = oldItem.Key
+	}
+	rid := uint(id)
+
 	if err := h.configService.DeleteConfigItem(uint(id)); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+
+	uid := middleware.GetUserID(c)
+	uname := middleware.GetUsername(c)
+	go h.auditService.CreateLog(&uid, uname, models.ActionDelete, models.ResourceConfig, &rid, configKey, oldValue, "", getClientIP(c))
 
 	c.JSON(http.StatusOK, gin.H{"message": "deleted"})
 }
@@ -135,6 +169,22 @@ func (h *ConfigHandler) BatchDeleteConfigItems(c *gin.Context) {
 		return
 	}
 
+	uid := middleware.GetUserID(c)
+	uname := middleware.GetUsername(c)
+	ip := getClientIP(c)
+
+	for _, id := range req.IDs {
+		oldItem, _ := h.configService.GetConfigItem(id)
+		oldValue := ""
+		configKey := ""
+		if oldItem != nil {
+			oldValue = oldItem.Value
+			configKey = oldItem.Key
+		}
+		rid := id
+		go h.auditService.CreateLog(&uid, uname, models.ActionDelete, models.ResourceConfig, &rid, configKey, oldValue, "", ip)
+	}
+
 	if err := h.configService.BatchDeleteConfigItems(req.IDs); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -145,8 +195,8 @@ func (h *ConfigHandler) BatchDeleteConfigItems(c *gin.Context) {
 
 func (h *ConfigHandler) BatchCopyConfigItems(c *gin.Context) {
 	var req struct {
-		SourceIDs  []uint `json:"source_ids"`
-		TargetEnv  string `json:"target_environment"`
+		SourceIDs       []uint `json:"source_ids"`
+		TargetEnvironment string `json:"target_environment"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -157,20 +207,31 @@ func (h *ConfigHandler) BatchCopyConfigItems(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "source_ids is required"})
 		return
 	}
-	if req.TargetEnv == "" {
+	if req.TargetEnvironment == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "target_environment is required"})
 		return
 	}
 
-	operator := c.GetHeader("X-Operator")
+	operator := middleware.GetUsername(c)
 	if operator == "" {
 		operator = "anonymous"
 	}
 
-	results, err := h.configService.BatchCopyConfigItems(req.SourceIDs, req.TargetEnv, operator)
+	results, err := h.configService.BatchCopyConfigItems(req.SourceIDs, req.TargetEnvironment, operator)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
+	}
+
+	uid := middleware.GetUserID(c)
+	uname := operator
+	ip := getClientIP(c)
+
+	for _, r := range results {
+		if r.Status == "success" {
+			rid := r.ID
+			go h.auditService.CreateLog(&uid, uname, models.ActionCreate, models.ResourceConfig, &rid, r.Key, "", "", ip)
+		}
 	}
 
 	successCount := 0
@@ -188,10 +249,10 @@ func (h *ConfigHandler) BatchCopyConfigItems(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"results": results,
+		"results":       results,
 		"success_count": successCount,
 		"skipped_count": skippedCount,
-		"failed_count": failedCount,
+		"failed_count":  failedCount,
 	})
 }
 
@@ -202,6 +263,14 @@ func (h *ConfigHandler) RollbackVersion(c *gin.Context) {
 		return
 	}
 
+	oldItem, _ := h.configService.GetConfigItem(uint(id))
+	oldValue := ""
+	configKey := ""
+	if oldItem != nil {
+		oldValue = oldItem.Value
+		configKey = oldItem.Key
+	}
+
 	var req struct {
 		Version int `json:"version"`
 	}
@@ -210,7 +279,7 @@ func (h *ConfigHandler) RollbackVersion(c *gin.Context) {
 		return
 	}
 
-	operator := c.GetHeader("X-Operator")
+	operator := middleware.GetUsername(c)
 	if operator == "" {
 		operator = "anonymous"
 	}
@@ -220,6 +289,12 @@ func (h *ConfigHandler) RollbackVersion(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+
+	uid := middleware.GetUserID(c)
+	uname := operator
+	rid := result.ID
+	newValue := result.Value
+	go h.auditService.CreateLog(&uid, uname, models.ActionRollback, models.ResourceConfig, &rid, configKey, oldValue, newValue, getClientIP(c))
 
 	c.JSON(http.StatusOK, result)
 }

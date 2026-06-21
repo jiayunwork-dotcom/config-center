@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { Card, Button, Space, Select, message, Tabs, Tag, Descriptions, Modal } from 'antd'
-import { SaveOutlined, HistoryOutlined, RollbackOutlined, ThunderboltOutlined } from '@ant-design/icons'
+import { SaveOutlined, HistoryOutlined, RollbackOutlined, ThunderboltOutlined, DeleteOutlined } from '@ant-design/icons'
 import Editor from '@monaco-editor/react'
-import { configApi, grayApi } from '../api'
+import { configApi, grayApi, permissionApi } from '../api'
 import VersionHistory from './VersionHistory'
 import DiffViewer from './DiffViewer'
 import GrayPanel from './GrayPanel'
@@ -10,7 +10,7 @@ import GrayPanel from './GrayPanel'
 const { Option } = Select
 const { TabPane } = Tabs
 
-function ConfigEditor({ config, environment, onConfigChange }) {
+function ConfigEditor({ config, environment, onConfigChange, currentUser }) {
   const [value, setValue] = useState('')
   const [format, setFormat] = useState('json')
   const [currentConfig, setCurrentConfig] = useState(null)
@@ -18,6 +18,8 @@ function ConfigEditor({ config, environment, onConfigChange }) {
   const [diffModalVisible, setDiffModalVisible] = useState(false)
   const [diffData, setDiffData] = useState([])
   const editorRef = useRef(null)
+
+  const canEdit = currentConfig ? permissionApi.canEdit(currentUser, currentConfig.namespace_id) : false
 
   useEffect(() => {
     if (config) {
@@ -32,6 +34,10 @@ function ConfigEditor({ config, environment, onConfigChange }) {
   }
 
   const handleSave = async () => {
+    if (!canEdit) {
+      message.warning('您没有修改该配置的权限')
+      return
+    }
     if (!currentConfig) return
 
     try {
@@ -74,6 +80,10 @@ function ConfigEditor({ config, environment, onConfigChange }) {
   }
 
   const handleRollback = async (version) => {
+    if (!canEdit) {
+      message.warning('您没有修改该配置的权限')
+      return
+    }
     Modal.confirm({
       title: '确认回滚',
       content: `确定要回滚到版本 ${version} 吗？`,
@@ -108,11 +118,18 @@ function ConfigEditor({ config, environment, onConfigChange }) {
             <span>{currentConfig.key}</span>
             <Tag color="blue">{format.toUpperCase()}</Tag>
             <Tag color="green">v{currentConfig.current_version}</Tag>
+            {!canEdit && <Tag color="default">只读</Tag>}
           </Space>
         }
         extra={
           <Space>
-            <Select value={format} onChange={handleFormatChange} style={{ width: 120 }} size="small">
+            <Select
+              value={format}
+              onChange={handleFormatChange}
+              style={{ width: 120 }}
+              size="small"
+              disabled={!canEdit}
+            >
               <Option value="json">JSON</Option>
               <Option value="yaml">YAML</Option>
               <Option value="properties">Properties</Option>
@@ -123,6 +140,7 @@ function ConfigEditor({ config, environment, onConfigChange }) {
               icon={<SaveOutlined />}
               onClick={handleSave}
               size="small"
+              disabled={!canEdit}
             >
               保存
             </Button>
@@ -130,6 +148,7 @@ function ConfigEditor({ config, environment, onConfigChange }) {
               icon={<ThunderboltOutlined />}
               size="small"
               onClick={() => setActiveTab('gray')}
+              disabled={!canEdit}
             >
               灰度发布
             </Button>
@@ -162,7 +181,8 @@ function ConfigEditor({ config, environment, onConfigChange }) {
                   fontSize: 14,
                   lineNumbers: 'on',
                   automaticLayout: true,
-                  wordWrap: 'on'
+                  wordWrap: 'on',
+                  readOnly: !canEdit,
                 }}
               />
             </div>
@@ -172,6 +192,7 @@ function ConfigEditor({ config, environment, onConfigChange }) {
             <VersionHistory
               configId={currentConfig.id}
               onRollback={handleRollback}
+              canEdit={canEdit}
               onCompare={(v1, v2, diff) => {
                 setDiffData(diff)
                 setDiffModalVisible(true)
@@ -183,6 +204,7 @@ function ConfigEditor({ config, environment, onConfigChange }) {
             <GrayPanel
               configId={currentConfig.id}
               currentVersion={currentConfig.current_version}
+              canEdit={canEdit}
             />
           </TabPane>
         </Tabs>

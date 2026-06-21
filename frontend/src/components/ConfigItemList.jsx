@@ -7,11 +7,11 @@ import {
   UnorderedListOutlined,
   CloseOutlined
 } from '@ant-design/icons'
-import { configApi } from '../api'
+import { configApi, permissionApi } from '../api'
 
 const { Option } = Select
 
-function ConfigItemList({ namespace, group, environment, onRefresh, onSelectConfig }) {
+function ConfigItemList({ namespace, group, environment, onRefresh, onSelectConfig, currentUser }) {
   const [configItems, setConfigItems] = useState([])
   const [loading, setLoading] = useState(false)
   const [batchMode, setBatchMode] = useState(false)
@@ -20,6 +20,8 @@ function ConfigItemList({ namespace, group, environment, onRefresh, onSelectConf
   const [copyModalVisible, setCopyModalVisible] = useState(false)
   const [targetEnv, setTargetEnv] = useState('')
   const [copyResult, setCopyResult] = useState(null)
+
+  const canEdit = permissionApi.canEdit(currentUser, namespace?.id)
 
   useEffect(() => {
     if (group && group.id) {
@@ -70,6 +72,10 @@ function ConfigItemList({ namespace, group, environment, onRefresh, onSelectConf
   }
 
   const handleDeleteClick = () => {
+    if (!canEdit) {
+      message.warning('您没有删除配置项的权限')
+      return
+    }
     if (selectedRowKeys.length === 0) {
       message.warning('请先选择要删除的配置项')
       return
@@ -92,6 +98,10 @@ function ConfigItemList({ namespace, group, environment, onRefresh, onSelectConf
   }
 
   const handleCopyClick = () => {
+    if (!canEdit) {
+      message.warning('您没有环境复制的权限')
+      return
+    }
     if (selectedRowKeys.length === 0) {
       message.warning('请先选择要复制的配置项')
       return
@@ -213,6 +223,7 @@ function ConfigItemList({ namespace, group, environment, onRefresh, onSelectConf
             <UnorderedListOutlined />
             <span>{group?.name || '配置项列表'}</span>
             <Tag color="green">{configItems.length} 条</Tag>
+            {!canEdit && <Tag color="default">只读</Tag>}
           </Space>
         }
         extra={
@@ -260,6 +271,7 @@ function ConfigItemList({ namespace, group, environment, onRefresh, onSelectConf
               size="small"
               icon={<DeleteOutlined />}
               onClick={handleDeleteClick}
+              disabled={!canEdit}
             >
               批量删除
             </Button>
@@ -267,6 +279,7 @@ function ConfigItemList({ namespace, group, environment, onRefresh, onSelectConf
               size="small"
               icon={<CopyOutlined />}
               onClick={handleCopyClick}
+              disabled={!canEdit}
             >
               批量环境复制
             </Button>

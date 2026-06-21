@@ -4,7 +4,7 @@ import { PlayCircleOutlined, CheckCircleOutlined, RollbackOutlined } from '@ant-
 import dayjs from 'dayjs'
 import { grayApi } from '../api'
 
-function GrayPanel({ configId, currentVersion }) {
+function GrayPanel({ configId, currentVersion, canEdit = true }) {
   const [grayList, setGrayList] = useState([])
   const [createModalVisible, setCreateModalVisible] = useState(false)
   const [form] = Form.useForm()
@@ -119,7 +119,11 @@ function GrayPanel({ configId, currentVersion }) {
   return (
     <div>
       <div style={{ marginBottom: 16 }}>
-        <Button type="primary" onClick={() => setCreateModalVisible(true)}>
+        <Button
+          type="primary"
+          onClick={() => setCreateModalVisible(true)}
+          disabled={!canEdit}
+        >
           新建灰度发布
         </Button>
       </div>
@@ -162,6 +166,7 @@ function GrayPanel({ configId, currentVersion }) {
                         size="small"
                         icon={<PlayCircleOutlined />}
                         onClick={() => handleStart(item.id)}
+                        disabled={!canEdit}
                       >
                         启动灰度
                       </Button>
@@ -173,6 +178,7 @@ function GrayPanel({ configId, currentVersion }) {
                           size="small"
                           icon={<CheckCircleOutlined />}
                           onClick={() => handleFullPush(item.id)}
+                          disabled={!canEdit}
                         >
                           全量推送
                         </Button>
@@ -181,6 +187,7 @@ function GrayPanel({ configId, currentVersion }) {
                           size="small"
                           icon={<RollbackOutlined />}
                           onClick={() => handleRollback(item.id)}
+                          disabled={!canEdit}
                         >
                           灰度回滚
                         </Button>

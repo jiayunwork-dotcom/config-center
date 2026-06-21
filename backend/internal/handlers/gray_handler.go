@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"config-center/internal/middleware"
 	"config-center/internal/models"
 	"config-center/internal/services"
 
@@ -11,12 +12,14 @@ import (
 )
 
 type GrayHandler struct {
-	grayService *services.GrayReleaseService
+	grayService  *services.GrayReleaseService
+	auditService *services.AuditService
 }
 
 func NewGrayHandler() *GrayHandler {
 	return &GrayHandler{
-		grayService: services.NewGrayReleaseService(),
+		grayService:  services.NewGrayReleaseService(),
+		auditService: services.NewAuditService(),
 	}
 }
 
@@ -37,6 +40,12 @@ func (h *GrayHandler) CreateGrayRelease(c *gin.Context) {
 		return
 	}
 
+	uid := middleware.GetUserID(c)
+	uname := middleware.GetUsername(c)
+	rid := result.ID
+	name := "gray-" + strconv.Itoa(int(result.ID))
+	go h.auditService.CreateLog(&uid, uname, models.ActionCreate, models.ResourceGray, &rid, name, "", "", getClientIP(c))
+
 	c.JSON(http.StatusOK, result)
 }
 
@@ -52,6 +61,12 @@ func (h *GrayHandler) StartGrayRelease(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+
+	uid := middleware.GetUserID(c)
+	uname := middleware.GetUsername(c)
+	rid := result.ID
+	name := "gray-" + strconv.Itoa(int(result.ID))
+	go h.auditService.CreateLog(&uid, uname, models.ActionStart, models.ResourceGray, &rid, name, "", "", getClientIP(c))
 
 	c.JSON(http.StatusOK, result)
 }
@@ -69,6 +84,12 @@ func (h *GrayHandler) FullPush(c *gin.Context) {
 		return
 	}
 
+	uid := middleware.GetUserID(c)
+	uname := middleware.GetUsername(c)
+	rid := result.ID
+	name := "gray-" + strconv.Itoa(int(result.ID))
+	go h.auditService.CreateLog(&uid, uname, models.ActionFullPush, models.ResourceGray, &rid, name, "", "", getClientIP(c))
+
 	c.JSON(http.StatusOK, result)
 }
 
@@ -84,6 +105,12 @@ func (h *GrayHandler) RollbackGrayRelease(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+
+	uid := middleware.GetUserID(c)
+	uname := middleware.GetUsername(c)
+	rid := result.ID
+	name := "gray-" + strconv.Itoa(int(result.ID))
+	go h.auditService.CreateLog(&uid, uname, models.ActionRollback, models.ResourceGray, &rid, name, "", "", getClientIP(c))
 
 	c.JSON(http.StatusOK, result)
 }

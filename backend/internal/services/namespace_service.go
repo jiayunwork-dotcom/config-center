@@ -21,9 +21,16 @@ func (s *NamespaceService) CreateNamespace(ns *models.Namespace) (*models.Namesp
 	return ns, nil
 }
 
-func (s *NamespaceService) GetNamespaces(tenantID uint) ([]models.Namespace, error) {
+func (s *NamespaceService) GetNamespaces(tenantID uint, accessibleIDs []uint) ([]models.Namespace, error) {
 	var namespaces []models.Namespace
-	err := database.DB.Where("tenant_id = ?", tenantID).Find(&namespaces).Error
+	query := database.DB.Where("tenant_id = ?", tenantID)
+	if accessibleIDs != nil {
+		if len(accessibleIDs) == 0 {
+			return []models.Namespace{}, nil
+		}
+		query = query.Where("id IN ?", accessibleIDs)
+	}
+	err := query.Find(&namespaces).Error
 	return namespaces, err
 }
 

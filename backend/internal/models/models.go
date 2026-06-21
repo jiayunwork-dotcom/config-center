@@ -101,3 +101,55 @@ type Metric struct {
 	Value       float64   `gorm:"not null" json:"value"`
 	Timestamp   time.Time `gorm:"not null;default:CURRENT_TIMESTAMP;index" json:"timestamp"`
 }
+
+type User struct {
+	ID            uint      `gorm:"primaryKey" json:"id"`
+	Username      string    `gorm:"size:100;unique;not null" json:"username"`
+	PasswordHash  string    `gorm:"size:255;not null" json:"-"`
+	CreatedAt     time.Time `json:"created_at"`
+}
+
+type UserRole struct {
+	ID          uint      `gorm:"primaryKey" json:"id"`
+	UserID      uint      `gorm:"not null;index" json:"user_id"`
+	NamespaceID *uint     `gorm:"index" json:"namespace_id"`
+	Role        string    `gorm:"size:20;not null" json:"role"`
+	CreatedAt   time.Time `json:"created_at"`
+}
+
+type AuditLog struct {
+	ID           uint      `gorm:"primaryKey" json:"id"`
+	TenantID     uint      `gorm:"not null;default:1" json:"tenant_id"`
+	UserID       *uint     `gorm:"index" json:"user_id"`
+	Username     string    `gorm:"size:100" json:"username"`
+	Action       string    `gorm:"size:50;not null" json:"action"`
+	ResourceType string    `gorm:"size:50;not null" json:"resource_type"`
+	ResourceID   *uint     `gorm:"index" json:"resource_id"`
+	ResourceName string    `gorm:"size:255" json:"resource_name"`
+	OldValue     string    `gorm:"type:text" json:"old_value"`
+	NewValue     string    `gorm:"type:text" json:"new_value"`
+	IPAddress    string    `gorm:"size:50" json:"ip_address"`
+	CreatedAt    time.Time `gorm:"index" json:"created_at"`
+}
+
+const (
+	RoleAdmin  = "admin"
+	RoleEditor = "editor"
+	RoleViewer = "viewer"
+)
+
+const (
+	ActionCreate   = "create"
+	ActionUpdate   = "update"
+	ActionDelete   = "delete"
+	ActionRollback = "rollback"
+	ActionStart    = "start"
+	ActionFullPush = "full_push"
+)
+
+const (
+	ResourceNamespace = "namespace"
+	ResourceGroup     = "group"
+	ResourceConfig    = "config"
+	ResourceGray      = "gray"
+)

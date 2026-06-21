@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react'
 import { Tree, Button, Modal, Input, message, Space } from 'antd'
 import { PlusOutlined, FolderOutlined, FileOutlined, AppstoreOutlined } from '@ant-design/icons'
-import { namespaceApi, groupApi, configApi } from '../api'
+import { namespaceApi, groupApi, configApi, permissionApi } from '../api'
 
 const { DirectoryTree } = Tree
 
-function ConfigTree({ environment, onSelect, onGroupSelect }) {
+function ConfigTree({ environment, onSelect, onGroupSelect, isAdmin, currentUser }) {
   const [treeData, setTreeData] = useState([])
   const [expandedKeys, setExpandedKeys] = useState([])
   const [addModalVisible, setAddModalVisible] = useState(false)
@@ -24,6 +24,7 @@ function ConfigTree({ environment, onSelect, onGroupSelect }) {
       const result = []
 
       for (const ns of namespaces) {
+        const canEditNS = permissionApi.canEdit(currentUser, ns.id)
         const groups = await groupApi.list(ns.id)
         const groupNodes = []
 
@@ -46,7 +47,9 @@ function ConfigTree({ environment, onSelect, onGroupSelect }) {
             title: group.name,
             icon: <FolderOutlined />,
             children: keyNodes,
-            group
+            group,
+            namespace: ns,
+            canEdit: canEditNS
           })
         }
 
@@ -55,7 +58,8 @@ function ConfigTree({ environment, onSelect, onGroupSelect }) {
           title: ns.name,
           icon: <AppstoreOutlined />,
           children: groupNodes,
-          namespace: ns
+          namespace: ns,
+          canEdit: canEditNS
         })
       }
 
@@ -69,8 +73,7 @@ function ConfigTree({ environment, onSelect, onGroupSelect }) {
     if (info.node.config) {
       onSelect && onSelect(info.node.config)
     } else if (info.node.group) {
-      const ns = findNamespaceByGroupId(info.node.group.id)
-      onGroupSelect && onGroupSelect(info.node.group, ns)
+      onGroupSelect && onGroupSelect(info.node.group, info.node.namespace)
     }
   }
 
@@ -88,6 +91,10 @@ function ConfigTree({ environment, onSelect, onGroupSelect }) {
   }
 
   const handleAddNamespace = () => {
+    if (!isAdmin) {
+      message.warning('只有管理员可以创建命名空间')
+      return
+    }
     setAddType('namespace')
     setParentId(null)
     setNewName('')
@@ -95,7 +102,11 @@ function ConfigTree({ environment, onSelect, onGroupSelect }) {
     setAddModalVisible(true)
   }
 
-  const handleAddGroup = (nsId) => {
+  const handleAddGroup = (nsId, canEdit) => {
+    if (!canEdit) {
+      message.warning('您没有在此命名空间创建分组的权限')
+      return
+    }
     setAddType('group')
     setParentId(nsId)
     setNewName('')
@@ -103,7 +114,11 @@ function ConfigTree({ environment, onSelect, onGroupSelect }) {
     setAddModalVisible(true)
   }
 
-  const handleAddConfig = (groupId, nsId) => {
+  const handleAddConfig = (groupId, nsId, canEdit) => {
+    if (!canEdit) {
+      message.warning('您没有在此分组创建配置的权限')
+      return
+    }
     setAddType('config')
     setParentId({ groupId, nsId })
     setNewName('')
@@ -147,23 +162,26 @@ function ConfigTree({ environment, onSelect, onGroupSelect }) {
   const renderTitle = (nodeData) => {
     const key = nodeData.key
     const prefix = key.split('-')[0]
+    const canEdit = nodeData.canEdit
 
     return (
       <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
         <span>{nodeData.title}</span>
-        <Button
-          type="text"
-          size="small"
-          icon={<PlusOutlined />}
-          onClick={(e) => {
-            e.stopPropagation()
-            if (prefix === 'ns') {
-              handleAddGroup(nodeData.namespace.id)
-            } else if (prefix === 'group') {
-              handleAddConfig(nodeData.group.id, nodeData.namespace ? nodeData.namespace.id : null)
-            }
-          }}
-        />
+        {canEdit && (
+          <Button
+            type="text"
+            size="small"
+            icon={<PlusOutlined />}
+            onClick={(e) => {
+              e.stopPropagation()
+              if (prefix === 'ns') {
+                handleAddGroup(nodeData.namespace.id, canEdit)
+              } else if (prefix === 'group') {
+                handleAddConfig(nodeData.group.id, nodeData.namespace.id, canEdit)
+              }
+            }}
+          />
+        )}
       </span>
     )
   }
@@ -186,14 +204,16 @@ function ConfigTree({ environment, onSelect, onGroupSelect }) {
     <div className="tree-container">
       <div className="tree-title">
         <span>配置树</span>
-        <Button
-          type="primary"
-          size="small"
-          icon={<PlusOutlined />}
-          onClick={handleAddNamespace}
-        >
-          命名空间
-        </Button>
+        {isAdmin && (
+          <Button
+            type="primary"
+            size="small"
+            icon={<PlusOutlined />}
+            onClick={handleAddNamespace}
+          >
+            命名空间
+          </Button>
+        )}
       </div>
       <DirectoryTree
         multiple={false}

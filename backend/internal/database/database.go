@@ -37,6 +37,9 @@ func AutoMigrate() error {
 		&models.GrayRelease{},
 		&models.ClientConnection{},
 		&models.Metric{},
+		&models.User{},
+		&models.UserRole{},
+		&models.AuditLog{},
 	)
 	if err != nil {
 		return fmt.Errorf("failed to migrate database: %w", err)

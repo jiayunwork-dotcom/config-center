@@ -4,7 +4,7 @@ import { ClockCircleOutlined, UserOutlined, RollbackOutlined } from '@ant-design
 import dayjs from 'dayjs'
 import { configApi } from '../api'
 
-function VersionHistory({ configId, onRollback, onCompare }) {
+function VersionHistory({ configId, onRollback, onCompare, canEdit = true }) {
   const [versions, setVersions] = useState([])
   const [loading, setLoading] = useState(false)
   const [compareVersion1, setCompareVersion1] = useState(null)
@@ -116,7 +116,7 @@ function VersionHistory({ configId, onRollback, onCompare }) {
                   size="small"
                   icon={<RollbackOutlined />}
                   onClick={() => onRollback && onRollback(version.version)}
-                  disabled={index === 0}
+                  disabled={index === 0 || !canEdit}
                 >
                   回滚到此版本
                 </Button>
