@@ -1,10 +1,12 @@
 package handlers
 
 import (
+	"fmt"
 	"net/http"
 	"strconv"
 
 	"config-center/internal/auth"
+	"config-center/internal/database"
 	"config-center/internal/middleware"
 	"config-center/internal/models"
 	"config-center/internal/services"
@@ -15,12 +17,14 @@ import (
 type AuthHandler struct {
 	authService *services.AuthService
 	roleService *services.RoleService
+	auditService *services.AuditService
 }
 
 func NewAuthHandler() *AuthHandler {
 	return &AuthHandler{
 		authService: services.NewAuthService(),
 		roleService: services.NewRoleService(),
+		auditService: services.NewAuditService(),
 	}
 }
 
@@ -143,6 +147,31 @@ func (h *AuthHandler) GrantRole(c *gin.Context) {
 		return
 	}
 
+	operatorID := middleware.GetUserID(c)
+	operator := middleware.GetUsername(c)
+
+	var targetUser models.User
+	database.DB.First(&targetUser, req.UserID)
+	username := targetUser.Username
+	nsPart := "global"
+	if req.NamespaceID != nil {
+		var ns models.Namespace
+		if err := database.DB.First(&ns, *req.NamespaceID).Error; err == nil {
+			nsPart = ns.Name
+		} else {
+			nsPart = fmt.Sprintf("ns_%d", *req.NamespaceID)
+		}
+	}
+	resourceName := fmt.Sprintf("%s:%s@%s", username, req.Role, nsPart)
+
+	go h.auditService.CreateLog(
+		&operatorID, operator,
+		models.ActionGrantRole, models.ResourceUserRole,
+		&req.UserID, resourceName,
+		"", req.Role,
+		getClientIP(c),
+	)
+
 	c.JSON(http.StatusOK, gin.H{"message": "role granted"})
 }
 
@@ -152,6 +181,39 @@ func (h *AuthHandler) RevokeRole(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
 		return
 	}
+
+	operatorID := middleware.GetUserID(c)
+	operator := middleware.GetUsername(c)
+
+	var userRole models.UserRole
+	if err := database.DB.First(&userRole, uint(id)).Error; err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "role binding not found"})
+		return
+	}
+
+	var targetUser models.User
+	database.DB.First(&targetUser, userRole.UserID)
+	username := targetUser.Username
+
+	nsPart := "global"
+	if userRole.NamespaceID != nil {
+		var ns models.Namespace
+		if err := database.DB.First(&ns, *userRole.NamespaceID).Error; err == nil {
+			nsPart = ns.Name
+		} else {
+			nsPart = fmt.Sprintf("ns_%d", *userRole.NamespaceID)
+		}
+	}
+	resourceName := fmt.Sprintf("%s:%s@%s", username, userRole.Role, nsPart)
+	roleID := uint(id)
+
+	go h.auditService.CreateLog(
+		&operatorID, operator,
+		models.ActionRevokeRole, models.ResourceUserRole,
+		&roleID, resourceName,
+		userRole.Role, "",
+		getClientIP(c),
+	)
 
 	if err := h.roleService.RevokeRole(uint(id)); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})

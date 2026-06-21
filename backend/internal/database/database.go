@@ -40,6 +40,7 @@ func AutoMigrate() error {
 		&models.User{},
 		&models.UserRole{},
 		&models.AuditLog{},
+		&models.PendingApproval{},
 	)
 	if err != nil {
 		return fmt.Errorf("failed to migrate database: %w", err)

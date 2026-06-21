@@ -54,6 +54,7 @@ func main() {
 	metricHandler := handlers.NewMetricHandler()
 	authHandler := handlers.NewAuthHandler()
 	auditHandler := handlers.NewAuditHandler()
+	approvalHandler := handlers.NewApprovalHandler()
 
 	r.GET("/health", func(c *gin.Context) {
 		c.JSON(200, gin.H{
@@ -81,6 +82,13 @@ func main() {
 			}
 			admin.POST("/roles/grant", authHandler.GrantRole)
 			admin.DELETE("/roles/:id", authHandler.RevokeRole)
+
+			approvals := admin.Group("/approvals")
+			{
+				approvals.GET("", approvalHandler.ListApprovals)
+				approvals.POST("/:id/approve", approvalHandler.Approve)
+				approvals.POST("/:id/reject", approvalHandler.Reject)
+			}
 		}
 
 		authenticated := api.Group("")

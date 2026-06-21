@@ -132,6 +132,24 @@ type AuditLog struct {
 	CreatedAt    time.Time `gorm:"index" json:"created_at"`
 }
 
+type PendingApproval struct {
+	ID           uint      `gorm:"primaryKey" json:"id"`
+	ApplicantID  uint      `gorm:"not null;index" json:"applicant_id"`
+	Applicant    string    `gorm:"size:100;not null" json:"applicant"`
+	ConfigItemID uint      `gorm:"not null;index" json:"config_item_id"`
+	ConfigKey    string    `gorm:"size:255;not null" json:"config_key"`
+	NewValue     string    `gorm:"type:text;not null" json:"new_value"`
+	OldValue     string    `gorm:"type:text" json:"old_value"`
+	Environment  string    `gorm:"size:50;not null;default:'prod'" json:"environment"`
+	Description  string    `gorm:"type:text" json:"description"`
+	Status       string    `gorm:"size:20;not null;default:'pending';index" json:"status"`
+	ReviewerID   *uint     `gorm:"index" json:"reviewer_id"`
+	Reviewer     string    `gorm:"size:100" json:"reviewer"`
+	ReviewNote   string    `gorm:"type:text" json:"review_note"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
+}
+
 const (
 	RoleAdmin  = "admin"
 	RoleEditor = "editor"
@@ -139,12 +157,14 @@ const (
 )
 
 const (
-	ActionCreate   = "create"
-	ActionUpdate   = "update"
-	ActionDelete   = "delete"
-	ActionRollback = "rollback"
-	ActionStart    = "start"
-	ActionFullPush = "full_push"
+	ActionCreate    = "create"
+	ActionUpdate    = "update"
+	ActionDelete    = "delete"
+	ActionRollback  = "rollback"
+	ActionStart     = "start"
+	ActionFullPush  = "full_push"
+	ActionGrantRole = "grant_role"
+	ActionRevokeRole = "revoke_role"
 )
 
 const (
@@ -152,4 +172,5 @@ const (
 	ResourceGroup     = "group"
 	ResourceConfig    = "config"
 	ResourceGray      = "gray"
+	ResourceUserRole  = "user_role"
 )

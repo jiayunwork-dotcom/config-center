@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { Card, Button, Space, Select, message, Tabs, Tag, Descriptions, Modal } from 'antd'
-import { SaveOutlined, HistoryOutlined, RollbackOutlined, ThunderboltOutlined, DeleteOutlined } from '@ant-design/icons'
+import { SaveOutlined, HistoryOutlined, RollbackOutlined, ThunderboltOutlined, DeleteOutlined, AuditOutlined } from '@ant-design/icons'
 import Editor from '@monaco-editor/react'
 import { configApi, grayApi, permissionApi } from '../api'
 import VersionHistory from './VersionHistory'
@@ -20,6 +20,10 @@ function ConfigEditor({ config, environment, onConfigChange, currentUser }) {
   const editorRef = useRef(null)
 
   const canEdit = currentConfig ? permissionApi.canEdit(currentUser, currentConfig.namespace_id) : false
+  const isAdmin = permissionApi.isAdmin(currentUser)
+  const isProdEditor = environment === 'prod' && canEdit && !isAdmin
+  const saveButtonText = isProdEditor ? '提交审批' : '保存'
+  const SaveButtonIcon = isProdEditor ? <AuditOutlined /> : <SaveOutlined />
 
   useEffect(() => {
     if (config) {
@@ -57,11 +61,21 @@ function ConfigEditor({ config, environment, onConfigChange, currentUser }) {
         description: '手动更新'
       })
 
+      if (result.requires_approval) {
+        message.info('已提交，等待管理员审批')
+        onConfigChange && onConfigChange()
+        return
+      }
+
       setCurrentConfig(result)
       message.success('保存成功')
       onConfigChange && onConfigChange()
     } catch (error) {
-      message.error('保存失败')
+      if (error.response && error.response.status === 409) {
+        message.warning('该配置已有待审批的变更申请')
+      } else {
+        message.error('保存失败')
+      }
     }
   }
 
@@ -119,6 +133,7 @@ function ConfigEditor({ config, environment, onConfigChange, currentUser }) {
             <Tag color="blue">{format.toUpperCase()}</Tag>
             <Tag color="green">v{currentConfig.current_version}</Tag>
             {!canEdit && <Tag color="default">只读</Tag>}
+            {isProdEditor && <Tag color="orange">需审批</Tag>}
           </Space>
         }
         extra={
@@ -137,12 +152,12 @@ function ConfigEditor({ config, environment, onConfigChange, currentUser }) {
             </Select>
             <Button
               type="primary"
-              icon={<SaveOutlined />}
+              icon={SaveButtonIcon}
               onClick={handleSave}
               size="small"
               disabled={!canEdit}
             >
-              保存
+              {saveButtonText}
             </Button>
             <Button
               icon={<ThunderboltOutlined />}

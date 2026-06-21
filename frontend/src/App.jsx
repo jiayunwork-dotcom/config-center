@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react'
 import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom'
 import { Layout, Menu, Breadcrumb, Select, Space, Button, Dropdown, Avatar, Tag, message } from 'antd'
-import { SettingOutlined, AppstoreOutlined, DashboardOutlined, UserOutlined, LogoutOutlined, HistoryOutlined, SafetyOutlined } from '@ant-design/icons'
+import { SettingOutlined, AppstoreOutlined, DashboardOutlined, UserOutlined, LogoutOutlined, HistoryOutlined, SafetyOutlined, AuditOutlined } from '@ant-design/icons'
 import ConfigTree from './components/ConfigTree'
 import ConfigEditor from './components/ConfigEditor'
 import ConfigItemList from './components/ConfigItemList'
 import Dashboard from './components/Dashboard'
 import LoginPage from './components/LoginPage'
 import AuditLog from './components/AuditLog'
+import ApprovalManagement from './components/ApprovalManagement'
 import { getToken, getUser, setUser, clearToken, authApi, permissionApi } from './api'
 import './App.css'
 
@@ -56,6 +57,7 @@ function AppLayout() {
     { key: 'configs', icon: <SettingOutlined />, label: '配置管理' },
     { key: 'dashboard', icon: <DashboardOutlined />, label: '监控看板' },
     { key: 'audit', icon: <HistoryOutlined />, label: '审计日志' },
+    ...(isAdmin ? [{ key: 'approvals', icon: <AuditOutlined />, label: '审批管理' }] : []),
   ]
 
   const userMenuItems = [
@@ -166,7 +168,7 @@ function AppLayout() {
           <Breadcrumb style={{ marginBottom: 16 }}>
             <Breadcrumb.Item>首页</Breadcrumb.Item>
             <Breadcrumb.Item>
-              {selectedKey === 'configs' ? '配置管理' : selectedKey === 'dashboard' ? '监控看板' : '审计日志'}
+              {selectedKey === 'configs' ? '配置管理' : selectedKey === 'dashboard' ? '监控看板' : selectedKey === 'approvals' ? '审批管理' : '审计日志'}
             </Breadcrumb.Item>
             {selectedKey === 'configs' && selectedNamespace && (
               <Breadcrumb.Item>{selectedNamespace.name}</Breadcrumb.Item>
@@ -198,6 +200,8 @@ function AppLayout() {
             )
           ) : selectedKey === 'dashboard' ? (
             <Dashboard environment={environment} />
+          ) : selectedKey === 'approvals' ? (
+            <ApprovalManagement />
           ) : (
             <AuditLog />
           )}

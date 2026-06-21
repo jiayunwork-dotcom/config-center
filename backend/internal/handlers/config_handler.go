@@ -17,6 +17,8 @@ type ConfigHandler struct {
 	namespaceService *services.NamespaceService
 	groupService     *services.GroupService
 	auditService     *services.AuditService
+	approvalService  *services.ApprovalService
+	roleService      *services.RoleService
 }
 
 func NewConfigHandler() *ConfigHandler {
@@ -25,6 +27,8 @@ func NewConfigHandler() *ConfigHandler {
 		namespaceService: services.NewNamespaceService(),
 		groupService:     services.NewGroupService(),
 		auditService:     services.NewAuditService(),
+		approvalService:  services.NewApprovalService(),
+		roleService:      services.NewRoleService(),
 	}
 }
 
@@ -113,13 +117,39 @@ func (h *ConfigHandler) UpdateConfigItem(c *gin.Context) {
 		operator = "anonymous"
 	}
 
+	userID := middleware.GetUserID(c)
+	isGlobalAdmin := h.roleService.IsGlobalAdmin(userID)
+
+	if oldItem != nil && oldItem.Environment == "prod" && !isGlobalAdmin {
+		hasPending, _ := h.approvalService.HasPendingApproval(uint(id))
+		if hasPending {
+			c.JSON(http.StatusConflict, gin.H{"error": "该配置已有待审批的变更申请"})
+			return
+		}
+
+		approval, err := h.approvalService.CreateApproval(
+			userID, operator, uint(id), configKey, req.Value, oldValue, oldItem.Environment, req.Description,
+		)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"message":       "已提交审批，等待管理员审批",
+			"approval_id":   approval.ID,
+			"requires_approval": true,
+		})
+		return
+	}
+
 	result, err := h.configService.UpdateConfigItem(uint(id), req.Value, operator, req.Description)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	uid := middleware.GetUserID(c)
+	uid := userID
 	uname := operator
 	rid := result.ID
 	go h.auditService.CreateLog(&uid, uname, models.ActionUpdate, models.ResourceConfig, &rid, configKey, oldValue, req.Value, getClientIP(c))

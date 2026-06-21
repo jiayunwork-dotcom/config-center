@@ -64,6 +64,12 @@ export const roleApi = {
   revoke: (id) => api.delete(`/roles/${id}`),
 }
 
+export const approvalApi = {
+  list: (params) => api.get('/approvals', { params }),
+  approve: (id) => api.post(`/approvals/${id}/approve`),
+  reject: (id, reviewNote) => api.post(`/approvals/${id}/reject`, { review_note: reviewNote }),
+}
+
 export const auditApi = {
   list: (params) => api.get('/audit-logs', { params }),
 }

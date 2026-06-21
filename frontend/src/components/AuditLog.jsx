@@ -14,6 +14,8 @@ const actionLabels = {
   rollback: { label: '回滚', color: 'orange' },
   start: { label: '启动', color: 'cyan' },
   full_push: { label: '全量推送', color: 'purple' },
+  grant_role: { label: '授权角色', color: 'geekblue' },
+  revoke_role: { label: '撤销角色', color: 'volcano' },
 }
 
 const resourceLabels = {
@@ -21,6 +23,7 @@ const resourceLabels = {
   group: '分组',
   config: '配置项',
   gray: '灰度发布',
+  user_role: '用户角色',
 }
 
 function AuditLog() {
