@@ -1,0 +1,121 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+
+#root {
+  width: 100%;
+  height: 100vh;
+}
+
+.app-layout {
+  height: 100vh;
+}
+
+.sider {
+  background: #001529;
+  overflow-y: auto;
+}
+
+.sider::-webkit-scrollbar {
+  width: 6px;
+}
+
+.sider::-webkit-scrollbar-thumb {
+  background: #4a5568;
+  border-radius: 3px;
+}
+
+.main-content {
+  padding: 24px;
+  overflow-y: auto;
+  background: #f0f2f5;
+}
+
+.config-editor-container {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 180px);
+}
+
+.editor-wrapper {
+  flex: 1;
+  border: 1px solid #d9d9d9;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.diff-line {
+  padding: 2px 8px;
+  font-family: monospace;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.diff-insert {
+  background-color: #e6ffed;
+  color: #22863a;
+}
+
+.diff-delete {
+  background-color: #ffeef0;
+  color: #b31d28;
+}
+
+.diff-equal {
+  background-color: #fff;
+}
+
+.version-timeline {
+  padding: 16px 0;
+}
+
+.gray-status-running {
+  color: #faad14;
+}
+
+.gray-status-completed {
+  color: #52c41a;
+}
+
+.gray-status-rolled_back {
+  color: #ff4d4f;
+}
+
+.connection-stats-card {
+  text-align: center;
+}
+
+.connection-stats-number {
+  font-size: 28px;
+  font-weight: bold;
+  color: #1890ff;
+}
+
+.tree-node-namespace {
+  font-weight: bold;
+}
+
+.tree-node-group {
+  color: #595959;
+}
+
+.tree-node-key {
+  color: #8c8c8c;
+}
+
+.toolbar {
+  margin-bottom: 16px;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.env-switch {
+  margin-left: auto;
+}

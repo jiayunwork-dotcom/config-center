@@ -1,0 +1,95 @@
+.header {
+  display: flex;
+  align-items: center;
+  background: #001529 !important;
+  padding: 0 24px;
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  margin-right: 24px;
+  color: white;
+}
+
+.header .ant-menu {
+  background: transparent !important;
+  border-bottom: none !important;
+}
+
+.header .ant-menu-item {
+  color: rgba(255,255,255,0.65) !important;
+}
+
+.header .ant-menu-item-selected {
+  color: white !important;
+  border-bottom-color: #1890ff !important;
+}
+
+.app-layout {
+  height: 100vh;
+}
+
+.sider {
+  background: #fff !important;
+  border-right: 1px solid #f0f0f0;
+  overflow-y: auto;
+}
+
+.main-content {
+  padding: 24px;
+  overflow-y: auto;
+  background: #f0f2f5;
+}
+
+.config-editor-container {
+  background: white;
+  padding: 24px;
+  border-radius: 8px;
+  height: calc(100vh - 180px);
+  display: flex;
+  flex-direction: column;
+}
+
+.editor-wrapper {
+  flex: 1;
+  border: 1px solid #d9d9d9;
+  border-radius: 4px;
+  overflow: hidden;
+  margin-top: 16px;
+}
+
+.toolbar {
+  margin-bottom: 16px;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.env-switch {
+  margin-left: auto;
+}
+
+.empty-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: #999;
+  font-size: 16px;
+}
+
+.tree-container {
+  padding: 12px;
+}
+
+.tree-title {
+  padding: 12px;
+  font-weight: bold;
+  border-bottom: 1px solid #f0f0f0;
+  margin-bottom: 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
