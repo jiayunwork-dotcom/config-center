@@ -5,6 +5,7 @@ import (
 	"strconv"
 
 	"config-center/internal/middleware"
+	"config-center/internal/models"
 	"config-center/internal/services"
 
 	"github.com/gin-gonic/gin"
@@ -55,6 +56,12 @@ func (h *ApprovalHandler) Approve(c *gin.Context) {
 		return
 	}
 
+	approval, err := h.approvalService.GetApproval(uint(id))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
 	reviewerID := middleware.GetUserID(c)
 	reviewer := middleware.GetUsername(c)
 
@@ -67,7 +74,7 @@ func (h *ApprovalHandler) Approve(c *gin.Context) {
 	uid := reviewerID
 	uname := reviewer
 	rid := result.ID
-	go h.auditService.CreateLog(&uid, uname, "update", "config", &rid, result.Key, "", result.Value, getClientIP(c))
+	go h.auditService.CreateLog(&uid, uname, models.ActionUpdate, models.ResourceConfig, &rid, result.Key, approval.OldValue, approval.NewValue, getClientIP(c))
 
 	c.JSON(http.StatusOK, gin.H{
 		"message": "approved and config updated",

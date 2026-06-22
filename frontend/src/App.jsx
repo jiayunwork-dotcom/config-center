@@ -53,6 +53,8 @@ function AppLayout() {
     navigate('/login', { replace: true })
   }
 
+  const isAdmin = permissionApi.isAdmin(currentUser)
+
   const menuItems = [
     { key: 'configs', icon: <SettingOutlined />, label: '配置管理' },
     { key: 'dashboard', icon: <DashboardOutlined />, label: '监控看板' },
@@ -97,8 +99,6 @@ function AppLayout() {
   const handleRefreshTree = () => {
     setTreeRefreshKey(prev => prev + 1)
   }
-
-  const isAdmin = permissionApi.isAdmin(currentUser)
 
   return (
     <Layout className="app-layout">

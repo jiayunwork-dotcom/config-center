@@ -182,9 +182,6 @@ func (h *AuthHandler) RevokeRole(c *gin.Context) {
 		return
 	}
 
-	operatorID := middleware.GetUserID(c)
-	operator := middleware.GetUsername(c)
-
 	var userRole models.UserRole
 	if err := database.DB.First(&userRole, uint(id)).Error; err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "role binding not found"})
@@ -205,20 +202,24 @@ func (h *AuthHandler) RevokeRole(c *gin.Context) {
 		}
 	}
 	resourceName := fmt.Sprintf("%s:%s@%s", username, userRole.Role, nsPart)
+	oldRole := userRole.Role
+
+	if err := h.roleService.RevokeRole(uint(id)); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	operatorID := middleware.GetUserID(c)
+	operator := middleware.GetUsername(c)
 	roleID := uint(id)
 
 	go h.auditService.CreateLog(
 		&operatorID, operator,
 		models.ActionRevokeRole, models.ResourceUserRole,
 		&roleID, resourceName,
-		userRole.Role, "",
+		oldRole, "",
 		getClientIP(c),
 	)
-
-	if err := h.roleService.RevokeRole(uint(id)); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "role revoked"})
 }
